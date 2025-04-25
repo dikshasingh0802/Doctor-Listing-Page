@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Doctor Listing Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: row;
+    }
+
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #003366;
+      padding: 1em;
+      color: white;
+      z-index: 1000;
+    }
+
+    #search {
+      width: 300px;
+      padding: 0.5em;
+    }
+
+    #suggestions {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      background: white;
+      border: 1px solid #ccc;
+      position: absolute;
+      max-width: 300px;
+    }
+
+    #suggestions li {
+      padding: 0.5em;
+      cursor: pointer;
+    }
+
+    #suggestions li:hover {
+      background: #eee;
+    }
+
+    aside {
+      margin-top: 80px;
+      padding: 1em;
+      width: 250px;
+      background: #f2f2f2;
+      border-right: 1px solid #ddd;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    main {
+      margin-top: 80px;
+      padding: 1em;
+      flex-grow: 1;
+      background: #f9f9f9;
+    }
+
+    .doctor-card {
+      border: 1px solid #ddd;
+      padding: 1em;
+      margin-bottom: 1em;
+      border-radius: 10px;
+      background: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .doctor-card h2 {
+      margin-top: 0;
+      color: #003366;
+    }
+
+    .doctor-card p {
+      margin: 5px 0;
+    }
+
+    .book-btn {
+      background-color: #007BFF;
+      color: white;
+      padding: 0.5em 1em;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .book-btn:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <input id="search" type="text" placeholder="Search doctor name">
+    <ul id="suggestions"></ul>
+  </header>
+
+  <aside>
+    <h3>Consultation Mode</h3>
+    <label><input type="radio" name="mode" value="Video Consult"> Video Consult</label><br/>
+    <label><input type="radio" name="mode" value="In Clinic"> In Clinic</label><br/>
+
+    <h3>Specialty</h3>
+    <div id="specialties"></div>
+
+    <h3>Sort By</h3>
+    <label><input type="radio" name="sort" value="fees"> Fees (Low to High)</label><br/>
+    <label><input type="radio" name="sort" value="experience"> Experience (High to Low)</label>
+  </aside>
+
+  <main id="doctor-list"></main>
+
+  <script>
+    const API_URL = 'https://srijandubey.github.io/campus-api-mock/SRM-C1-25.json';
+    let allDoctors = [];
+
+    const searchInput = document.getElementById('search');
+    const suggestionsBox = document.getElementById('suggestions');
+    const specialtiesDiv = document.getElementById('specialties');
+    const doctorList = document.getElementById('doctor-list');
+
+    const specialties = [
+      "General Physician", "Dentist", "Dermatologist", "Paediatrician", "Gynaecologist",
+      "ENT", "Diabetologist", "Cardiologist", "Physiotherapist", "Endocrinologist",
+      "Orthopaedic", "Ophthalmologist", "Gastroenterologist", "Pulmonologist", "Psychiatrist",
+      "Urologist", "Dietitian/Nutritionist", "Psychologist", "Sexologist", "Nephrologist",
+      "Neurologist", "Oncologist", "Ayurveda", "Homeopath"
+    ];
+
+    // Render specialty checkboxes
+    specialties.forEach(spec => {
+      const id = `filter-specialty-${spec.replace(/\s|\//g, "-")}`;
+      specialtiesDiv.innerHTML += `
+        <label><input type="checkbox" value="${spec}"> ${spec}</label><br/>
+      `;
+    });
+
+    async function fetchDoctors() {
+      const res = await fetch(API_URL);
+      allDoctors = await res.json();
+      applyFilters();
+    }
+    fetchDoctors();
+
+    // Autocomplete
+    searchInput.addEventListener('input', () => {
+      const input = searchInput.value.toLowerCase();
+      suggestionsBox.innerHTML = '';
+      if (!input) return;
+      const matches = allDoctors
+        .filter(doc => doc.name.toLowerCase().includes(input))
+        .slice(0, 5);
+      matches.forEach(doc => {
+        const li = document.createElement('li');
+        li.textContent = doc.name;
+        li.onclick = () => {
+          searchInput.value = doc.name;
+          applyFilters();
+          suggestionsBox.innerHTML = '';
+        };
+        suggestionsBox.appendChild(li);
+      });
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        applyFilters();
+        suggestionsBox.innerHTML = '';
+      }
+    });
+
+    document.querySelectorAll('input').forEach(input => {
+      input.addEventListener('change', () => {
+        applyFilters();
+      });
+    });
+
+    function applyFilters() {
+      const search = searchInput.value.trim().toLowerCase();
+      const mode = document.querySelector('input[name="mode"]:checked')?.value;
+      const sort = document.querySelector('input[name="sort"]:checked')?.value;
+      const selectedSpecs = [...document.querySelectorAll('#specialties input:checked')].map(cb => cb.value);
+
+      let filtered = [...allDoctors];
+
+      if (search) {
+        filtered = filtered.filter(doc => doc.name.toLowerCase().includes(search));
+      }
+
+      if (mode) {
+        filtered = filtered.filter(doc => doc.consultationType === mode);
+      }
+
+      if (selectedSpecs.length) {
+        filtered = filtered.filter(doc => selectedSpecs.some(spec => doc.specialities.includes(spec)));
+      }
+
+      if (sort === 'fees') {
+        filtered.sort((a, b) => a.fees - b.fees);
+      } else if (sort === 'experience') {
+        filtered.sort((a, b) => b.experience - a.experience);
+      }
+
+      renderDoctors(filtered);
+    }
+
+    function renderDoctors(doctors) {
+      doctorList.innerHTML = '';
+      if (!doctors.length) {
+        doctorList.innerHTML = '<p>No doctors found.</p>';
+        return;
+      }
+
+      doctors.forEach(doc => {
+        const div = document.createElement('div');
+        div.className = 'doctor-card';
+        div.innerHTML = `
+          <h2>${doc.name}</h2>
+          <p><strong>Specialties:</strong> ${doc.specialities.join(', ')}</p>
+          <p><strong>Experience:</strong> ${doc.experience} years</p>
+          <p><strong>Fees:</strong> ₹${doc.fees}</p>
+          <button class="book-btn">Book Appointment</button>
+        `;
+        doctorList.appendChild(div);
+      });
+    }
+  </script>
+</body>
+</html>
